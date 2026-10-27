@@ -22,6 +22,28 @@ for dev in /sys/class/net/*; do
   net_tx=$((net_tx + tx))
 done
 
+# GPU: the first card whose driver reports a busy percentage (amdgpu). On an
+# integrated GPU, VRAM is a small carve-out and most memory is shared (GTT).
+gpu=null
+for card in /sys/class/drm/card[0-9]*; do
+  [[ -r $card/device/gpu_busy_percent ]] || continue
+  read -r gpu_busy <"$card/device/gpu_busy_percent"
+  gpu_mem=()
+  for f in vram_used vram_total gtt_used gtt_total; do
+    v=0
+    [[ -r $card/device/mem_info_$f ]] && read -r v <"$card/device/mem_info_$f"
+    gpu_mem+=("$v")
+  done
+  gpu_temp=-1
+  for f in "$card"/device/hwmon/hwmon*/temp1_input; do
+    [[ -r $f ]] && read -r gpu_temp <"$f" && gpu_temp=$((gpu_temp / 1000))
+    break
+  done
+  gpu=$(printf '{"busy":%d,"vramUsed":%d,"vramTotal":%d,"gttUsed":%d,"gttTotal":%d,"temp":%d}' \
+    "$gpu_busy" "${gpu_mem[@]}" "$gpu_temp")
+  break
+done
+
 # NPU: the first accel-class device (AMD XDNA, Intel NPU). Only runtime power
 # accounting is read here; querying the device itself would wake it.
 npu_dev="" npu_node="" npu_name="" npu_state="" npu_active=0
@@ -145,5 +167,5 @@ disks=$(df -PB1 -x tmpfs -x devtmpfs -x squashfs -x overlay -x efivarfs 2>/dev/n
   }
   END { printf "%s", (first ? first (rest ? "," rest : "") : rest) }')
 
-printf '{"cpu":%d,"memUsed":%d,"memTotal":%d,"memAvail":%d,"swapUsed":%d,"swapTotal":%d,"temp":%d,"rx":%d,"tx":%d,"npu":%s,"disks":[%s]}\n' \
-  "$cpu_pct" "$mem_used" "$mem_total" "$mem_avail" "$swap_used" "$swap_total" "$temp" "$rx_rate" "$tx_rate" "$npu" "$disks"
+printf '{"cpu":%d,"memUsed":%d,"memTotal":%d,"memAvail":%d,"swapUsed":%d,"swapTotal":%d,"temp":%d,"rx":%d,"tx":%d,"gpu":%s,"npu":%s,"disks":[%s]}\n' \
+  "$cpu_pct" "$mem_used" "$mem_total" "$mem_avail" "$swap_used" "$swap_total" "$temp" "$rx_rate" "$tx_rate" "$gpu" "$npu" "$disks"

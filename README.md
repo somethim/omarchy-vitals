@@ -69,7 +69,7 @@ hot-reloads on save), or with `omarchy bar set adams100111.vitals <key> <value>`
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
-| `metrics` | list | `["memory","disk"]` | Which resources show inline, in display order. Any of `cpu`, `npu`, `memory`, `swap`, `disk`, `temp`, `network`. An empty list shows none. |
+| `metrics` | list | `["memory","disk"]` | Which resources show inline, in display order. Any of `cpu`, `gpu`, `npu`, `memory`, `swap`, `disk`, `temp`, `network`. An empty list shows none. |
 | `intervalSec` | int | `3` | Seconds between samples. |
 | `showIcons` | bool | `true` | Draw the icon next to each value. |
 | `showUnits` | bool | `true` | Append `%` / `°C`. |
@@ -77,10 +77,18 @@ hot-reloads on save), or with `omarchy bar set adams100111.vitals <key> <value>`
 | `alertStyle` | enum | `Color and bold` | `Color`, `Bold`, `Color and bold`, or `Color and dot`. |
 | `alertColor` | string | `""` | Color for a breached threshold, e.g. `#de6145`. Empty follows the theme. |
 | `cpuWarnPct` | int | `85` | Alert once CPU is above this. |
+| `gpuWarnPct` | int | `85` | Alert once GPU busy is above this. |
 | `memoryWarnPct` | int | `85` | Alert once memory used is above this (85 = warn under 15% free). |
 | `swapWarnPct` | int | `50` | Alert once swap used is above this. |
 | `diskWarnPct` | int | `85` | Alert once disk used is above this (85 = warn under 15% free). |
 | `tempWarnC` | int | `80` | Alert once CPU temperature is above this. |
+
+## GPU
+
+The `gpu` resource shows how busy the GPU is, as reported by drivers that
+expose it (amdgpu). The popup adds VRAM, shared memory and temperature. On an
+integrated GPU, VRAM is a small fixed slice and models live in shared memory,
+so that is the figure to watch while running a local model.
 
 ## NPU
 
@@ -125,7 +133,7 @@ mount in another bar section.
 ## Layout
 
 - `vitals-sample` — emits one JSON line of metrics, reading `/proc/stat`,
-  `/proc/meminfo`, `/sys/class/net`, `/sys/class/hwmon`, `/sys/class/accel`,
+  `/proc/meminfo`, `/sys/class/net`, `/sys/class/hwmon`, `/sys/class/drm`, `/sys/class/accel`,
   `/proc/*/fdinfo` and `df`. CPU, network and NPU are rates, so previous counters live in
   `$XDG_RUNTIME_DIR/omarchy-vitals.<key>.state`, one per widget instance.
 - `Panel.qml` — bar chips, threshold styling, the detail popup, and the

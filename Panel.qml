@@ -23,7 +23,7 @@ Panel {
   readonly property real contentHeight: chips.length > 0 ? layout.implicitHeight : placeholder.implicitHeight
 
   // Canonical display order, used when a resource is pinned back on.
-  readonly property var metricOrder: ["cpu", "npu", "memory", "swap", "disk", "temp", "network"]
+  readonly property var metricOrder: ["cpu", "gpu", "npu", "memory", "swap", "disk", "temp", "network"]
 
   // ------------------------------------------------------- setting access
   // Read settings from the live shell config rather than from the `settings`
@@ -277,8 +277,17 @@ Panel {
     return disks.length > 0 ? disks[0] : null
   }
 
-  // Absent when the machine has no NPU, so its chip and row simply drop out.
+  // Absent when the machine has no such device, so its chip and row drop out.
+  readonly property var gpu: sample.gpu ? sample.gpu : null
   readonly property var npu: sample.npu ? sample.npu : null
+
+  function gpuSummary(g) {
+    var parts = [g.busy + "%"]
+    if (g.vramTotal > 0) parts.push("VRAM " + root.fmtSize(g.vramUsed) + " / " + root.fmtSize(g.vramTotal))
+    if (g.gttTotal > 0) parts.push("shared " + root.fmtSize(g.gttUsed))
+    if (g.temp >= 0) parts.push(g.temp + " °C")
+    return parts.join("  ·  ")
+  }
 
   function npuSummary(n) {
     var parts = [n.state === "active" ? "Awake " + Math.round(n.awake / 10) + "%" : "Asleep"]
@@ -332,6 +341,12 @@ Panel {
         var cpu = (root.sample.cpu || 0) / 10
         out.push({ icon: "󰻠", text: root.fmtPct(cpu), warn: cpu >= root.warnAt("cpuWarnPct", 85) })
 
+      } else if (key === "gpu") {
+        if (root.gpu) {
+          out.push({ icon: "󰢮", text: root.fmtPct(root.gpu.busy),
+                     warn: root.gpu.busy >= root.warnAt("gpuWarnPct", 85) })
+        }
+
       } else if (key === "npu") {
         if (root.npu) {
           var awake = root.npu.awake / 10
@@ -378,6 +393,12 @@ Panel {
     rows.push({ key: "cpu", mount: "", label: "CPU", value: Math.round(cpu) + "%",
                 pct: cpu, warn: cpu >= root.warnAt("cpuWarnPct", 85),
                 pinned: root.isPinned("cpu") })
+
+    if (root.gpu) {
+      rows.push({ key: "gpu", mount: "", label: "GPU", value: root.gpuSummary(root.gpu),
+                  pct: root.gpu.busy, warn: root.gpu.busy >= root.warnAt("gpuWarnPct", 85),
+                  pinned: root.isPinned("gpu") })
+    }
 
     if (root.npu) {
       var npuPct = root.npu.awake / 10

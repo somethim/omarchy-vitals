@@ -14,13 +14,14 @@
   },
   "barWidget": {
     "displayName": "Vitals",
-    "description": "Inline CPU, NPU, memory, swap, disk, temperature and network readouts with per-resource alert thresholds; click a popup row to show or hide it.",
+    "description": "Inline CPU, GPU, NPU, memory, swap, disk, temperature and network readouts with per-resource alert thresholds; click a popup row to show or hide it.",
     "category": "System",
     "aliases": [
       "vitals",
       "resources",
       "sysmon",
-      "npu"
+      "npu",
+      "gpu"
     ],
     "allowMultiple": true,
     "defaultSection": "right",
@@ -39,7 +40,8 @@
       "diskWarnPct": 85,
       "tempWarnC": 80,
       "alertStyle": "Color and bold",
-      "alertColor": ""
+      "alertColor": "",
+      "gpuWarnPct": 85
     },
     "schema": [
       {
@@ -59,6 +61,11 @@
             "value": "cpu",
             "label": "CPU",
             "description": "Processor load across all cores"
+          },
+          {
+            "value": "gpu",
+            "label": "GPU",
+            "description": "How busy the graphics processor is"
           },
           {
             "value": "npu",
@@ -146,6 +153,15 @@
         "key": "cpuWarnPct",
         "type": "integer",
         "label": "Alert when CPU above (%)",
+        "min": 0,
+        "max": 100,
+        "step": 5,
+        "defaultValue": 85
+      },
+      {
+        "key": "gpuWarnPct",
+        "type": "integer",
+        "label": "Alert when GPU above (%)",
         "min": 0,
         "max": 100,
         "step": 5,
