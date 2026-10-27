@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "adams100111.vitals",
   "name": "Vitals",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Abdelrhman Eltahir",
   "license": "MIT",
   "description": "Pick which system resources show inline in the bar, each as an icon with its value and unit, highlighted when it crosses a threshold.",
@@ -14,12 +14,13 @@
   },
   "barWidget": {
     "displayName": "Vitals",
-    "description": "Inline CPU, memory, swap, disk, temperature and network readouts with per-resource alert thresholds; click a popup row to show or hide it.",
+    "description": "Inline CPU, NPU, memory, swap, disk, temperature and network readouts with per-resource alert thresholds; click a popup row to show or hide it.",
     "category": "System",
     "aliases": [
       "vitals",
       "resources",
-      "sysmon"
+      "sysmon",
+      "npu"
     ],
     "allowMultiple": true,
     "defaultSection": "right",
@@ -58,6 +59,11 @@
             "value": "cpu",
             "label": "CPU",
             "description": "Processor load across all cores"
+          },
+          {
+            "value": "npu",
+            "label": "NPU",
+            "description": "Share of time the neural processing unit is awake, with connected apps in the popup"
           },
           {
             "value": "memory",

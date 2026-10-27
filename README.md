@@ -69,7 +69,7 @@ hot-reloads on save), or with `omarchy bar set adams100111.vitals <key> <value>`
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
-| `metrics` | list | `["memory","disk"]` | Which resources show inline, in display order. Any of `cpu`, `memory`, `swap`, `disk`, `temp`, `network`. An empty list shows none. |
+| `metrics` | list | `["memory","disk"]` | Which resources show inline, in display order. Any of `cpu`, `npu`, `memory`, `swap`, `disk`, `temp`, `network`. An empty list shows none. |
 | `intervalSec` | int | `3` | Seconds between samples. |
 | `showIcons` | bool | `true` | Draw the icon next to each value. |
 | `showUnits` | bool | `true` | Append `%` / `°C`. |
@@ -81,6 +81,18 @@ hot-reloads on save), or with `omarchy bar set adams100111.vitals <key> <value>`
 | `swapWarnPct` | int | `50` | Alert once swap used is above this. |
 | `diskWarnPct` | int | `85` | Alert once disk used is above this (85 = warn under 15% free). |
 | `tempWarnC` | int | `80` | Alert once CPU temperature is above this. |
+
+## NPU
+
+On a machine with an NPU (an accel device such as AMD XDNA or Intel NPU), the
+`npu` resource shows how much of each sample interval the NPU was awake. The
+popup row adds how many apps have it open and the NPU memory they hold. No
+NPU, no row.
+
+The kernel exposes no NPU load counter, so being awake is the closest signal
+available. The driver keeps the NPU awake for a few seconds after each job, so
+short bursts read high. An app that keeps the NPU open while idle still counts
+in the popup. The readout never opens the device: `xrt-smi` would wake it.
 
 On a monochrome theme the alert may be hard to see, because `Color.urgent`
 follows the theme's `red`, which such themes define as a grey. Set `alertColor`
@@ -113,9 +125,9 @@ mount in another bar section.
 ## Layout
 
 - `vitals-sample` — emits one JSON line of metrics, reading `/proc/stat`,
-  `/proc/meminfo`, `/sys/class/net`, `/sys/class/hwmon` and `df`. CPU and
-  network are rates, so previous counters live in
-  `$XDG_RUNTIME_DIR/omarchy-vitals.state`.
+  `/proc/meminfo`, `/sys/class/net`, `/sys/class/hwmon`, `/sys/class/accel`,
+  `/proc/*/fdinfo` and `df`. CPU, network and NPU are rates, so previous counters live in
+  `$XDG_RUNTIME_DIR/omarchy-vitals.<key>.state`, one per widget instance.
 - `Panel.qml` — bar chips, threshold styling, the detail popup, and the
   toggle/persistence logic.
 - `manifest.json` — the settings schema that drives Omarchy's settings UI.

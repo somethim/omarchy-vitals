@@ -1,9 +1,11 @@
 #!/bin/bash
 # Emit one JSON line describing current system resources.
-# CPU and network are rates, so previous counters are kept in a state file.
+# CPU, network and NPU are rates, so previous counters are kept in a state file.
 
-STATE="${XDG_RUNTIME_DIR:-/tmp}/omarchy-vitals.state"
+# Each widget instance passes its own key: instances sharing one state file
+# would each measure only the moments since the other's last sample.
 DISK_PATH="${1:-/}"
+STATE="${XDG_RUNTIME_DIR:-/tmp}/omarchy-vitals${2:+.$2}.state"
 
 read -r _ u n s i w irq sirq st _ </proc/stat
 cpu_total=$((u + n + s + i + w + irq + sirq + st))
@@ -20,10 +22,23 @@ for dev in /sys/class/net/*; do
   net_tx=$((net_tx + tx))
 done
 
+# NPU: the first accel-class device (AMD XDNA, Intel NPU). Only runtime power
+# accounting is read here; querying the device itself would wake it.
+npu_dev="" npu_node="" npu_name="" npu_state="" npu_active=0
+for acc in /sys/class/accel/accel*; do
+  [[ -r $acc/device/power/runtime_status ]] || continue
+  npu_dev=$(readlink -f "$acc/device")
+  npu_node=${acc##*/}
+  read -r npu_state <"$acc/device/power/runtime_status"
+  read -r npu_active <"$acc/device/power/runtime_active_time"
+  [[ -r $acc/device/vbnv ]] && read -r npu_name <"$acc/device/vbnv"
+  break
+done
+
 now=$(date +%s%3N)
-prev_total=0 prev_idle=0 prev_rx=0 prev_tx=0 prev_ms=0
-[[ -r $STATE ]] && read -r prev_total prev_idle prev_rx prev_tx prev_ms <"$STATE"
-printf '%s %s %s %s %s\n' "$cpu_total" "$cpu_idle" "$net_rx" "$net_tx" "$now" >"$STATE"
+prev_total=0 prev_idle=0 prev_rx=0 prev_tx=0 prev_ms=0 prev_npu=""
+[[ -r $STATE ]] && read -r prev_total prev_idle prev_rx prev_tx prev_ms prev_npu <"$STATE"
+printf '%s %s %s %s %s %s\n' "$cpu_total" "$cpu_idle" "$net_rx" "$net_tx" "$now" "$npu_active" >"$STATE"
 
 cpu_pct=0
 dt=$((cpu_total - prev_total))
@@ -37,6 +52,51 @@ rx_rate=0 tx_rate=0
 if ((prev_ms > 0 && elapsed > 0)); then
   ((net_rx >= prev_rx)) && rx_rate=$(((net_rx - prev_rx) * 1000 / elapsed))
   ((net_tx >= prev_tx)) && tx_rate=$(((net_tx - prev_tx) * 1000 / elapsed))
+fi
+
+# NPU awake share of the interval, in tenths of a percent like CPU. It counts
+# the driver's idle delay before powering down, so short jobs read high.
+npu_awake=0
+if [[ -n $npu_dev && -n $prev_npu ]] && ((prev_ms > 0 && elapsed > 0 && npu_active >= prev_npu)); then
+  npu_awake=$(((npu_active - prev_npu) * 1000 / elapsed))
+  ((npu_awake > 1000)) && npu_awake=1000
+fi
+
+# NPU clients: processes holding the device open, and the memory the kernel
+# accounts to them. An idle client keeps the device open while it sleeps.
+npu_pids=0 npu_mem=0
+if [[ -n $npu_dev ]]; then
+  declare -A seen_pid seen_client
+  while IFS= read -r fd; do
+    pid=${fd#/proc/}
+    pid=${pid%%/*}
+    client="" mem=0
+    while read -r key val unit; do
+      case $key in
+        drm-client-id:) client=$val ;;
+        drm-total-memory:)
+          case $unit in
+            KiB) mem=$((val * 1024)) ;;
+            MiB) mem=$((val * 1048576)) ;;
+            GiB) mem=$((val * 1073741824)) ;;
+            *) mem=$val ;;
+          esac
+          ;;
+      esac
+    done <"${fd/\/fd\//\/fdinfo\/}" 2>/dev/null
+    [[ -n ${seen_pid[$pid]} ]] || { seen_pid[$pid]=1; npu_pids=$((npu_pids + 1)); }
+    if [[ -n $client && -z ${seen_client[$client]} ]]; then
+      seen_client[$client]=1
+      npu_mem=$((npu_mem + mem))
+    fi
+  done < <(find /proc/[0-9]*/fd -lname "/dev/accel/$npu_node" 2>/dev/null)
+fi
+
+npu=null
+if [[ -n $npu_dev ]]; then
+  npu_name=${npu_name//\"/}
+  npu=$(printf '{"name":"%s","state":"%s","awake":%d,"clients":%d,"mem":%d}' \
+    "${npu_name:-NPU}" "$npu_state" "$npu_awake" "$npu_pids" "$npu_mem")
 fi
 
 # Memory and swap, in bytes, straight from /proc/meminfo (values are kB).
@@ -85,5 +145,5 @@ disks=$(df -PB1 -x tmpfs -x devtmpfs -x squashfs -x overlay -x efivarfs 2>/dev/n
   }
   END { printf "%s", (first ? first (rest ? "," rest : "") : rest) }')
 
-printf '{"cpu":%d,"memUsed":%d,"memTotal":%d,"memAvail":%d,"swapUsed":%d,"swapTotal":%d,"temp":%d,"rx":%d,"tx":%d,"disks":[%s]}\n' \
-  "$cpu_pct" "$mem_used" "$mem_total" "$mem_avail" "$swap_used" "$swap_total" "$temp" "$rx_rate" "$tx_rate" "$disks"
+printf '{"cpu":%d,"memUsed":%d,"memTotal":%d,"memAvail":%d,"swapUsed":%d,"swapTotal":%d,"temp":%d,"rx":%d,"tx":%d,"npu":%s,"disks":[%s]}\n' \
+  "$cpu_pct" "$mem_used" "$mem_total" "$mem_avail" "$swap_used" "$swap_total" "$temp" "$rx_rate" "$tx_rate" "$npu" "$disks"

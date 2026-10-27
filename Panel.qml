@@ -23,7 +23,7 @@ Panel {
   readonly property real contentHeight: chips.length > 0 ? layout.implicitHeight : placeholder.implicitHeight
 
   // Canonical display order, used when a resource is pinned back on.
-  readonly property var metricOrder: ["cpu", "memory", "swap", "disk", "temp", "network"]
+  readonly property var metricOrder: ["cpu", "npu", "memory", "swap", "disk", "temp", "network"]
 
   // ------------------------------------------------------- setting access
   // Read settings from the live shell config rather than from the `settings`
@@ -277,6 +277,19 @@ Panel {
     return disks.length > 0 ? disks[0] : null
   }
 
+  // Absent when the machine has no NPU, so its chip and row simply drop out.
+  readonly property var npu: sample.npu ? sample.npu : null
+
+  function npuSummary(n) {
+    var parts = [n.state === "active" ? "Awake " + Math.round(n.awake / 10) + "%" : "Asleep"]
+    if (n.clients > 0) parts.push(n.clients === 1 ? "1 app" : n.clients + " apps")
+    if (n.mem > 0) parts.push(root.fmtSize(n.mem))
+    return parts.join("  ·  ")
+  }
+
+  // Keeps this instance's rate counters apart from any other bar's.
+  readonly property string stateKey: Math.random().toString(36).slice(2, 10)
+
   readonly property string helperPath: decodeURIComponent(
     String(Qt.resolvedUrl("vitals-sample")).replace("file://", ""))
 
@@ -319,6 +332,12 @@ Panel {
         var cpu = (root.sample.cpu || 0) / 10
         out.push({ icon: "󰻠", text: root.fmtPct(cpu), warn: cpu >= root.warnAt("cpuWarnPct", 85) })
 
+      } else if (key === "npu") {
+        if (root.npu) {
+          var awake = root.npu.awake / 10
+          out.push({ icon: "󰧑", text: root.fmtPct(awake), warn: false })
+        }
+
       } else if (key === "memory") {
         var mem = root.pctOf(root.sample.memUsed, root.sample.memTotal)
         out.push({ icon: "󰍛", text: root.fmtPct(mem), warn: mem >= root.warnAt("memoryWarnPct", 85) })
@@ -359,6 +378,13 @@ Panel {
     rows.push({ key: "cpu", mount: "", label: "CPU", value: Math.round(cpu) + "%",
                 pct: cpu, warn: cpu >= root.warnAt("cpuWarnPct", 85),
                 pinned: root.isPinned("cpu") })
+
+    if (root.npu) {
+      var npuPct = root.npu.awake / 10
+      rows.push({ key: "npu", mount: "", label: root.npu.name || "NPU",
+                  value: root.npuSummary(root.npu), pct: npuPct, warn: false,
+                  pinned: root.isPinned("npu") })
+    }
 
     var memPct = root.pctOf(root.sample.memUsed, root.sample.memTotal)
     rows.push({ key: "memory", mount: "", label: "Memory",
@@ -402,7 +428,7 @@ Panel {
   // ------------------------------------------------------------- sampling
   Process {
     id: sampler
-    command: [root.helperPath, root.diskPath]
+    command: [root.helperPath, root.diskPath, root.stateKey]
     stdout: SplitParser {
       onRead: function(line) {
         if (!line || line.length === 0) return
