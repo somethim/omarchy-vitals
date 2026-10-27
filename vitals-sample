@@ -6,6 +6,8 @@
 # would each measure only the moments since the other's last sample.
 DISK_PATH="${1:-/}"
 STATE="${XDG_RUNTIME_DIR:-/tmp}/omarchy-vitals${2:+.$2}.state"
+# A new instance (each shell reload) clears the state its predecessors left.
+[[ -e $STATE ]] || find "${STATE%/*}" -maxdepth 1 -name 'omarchy-vitals.*.state' -mmin +10 -delete 2>/dev/null
 
 read -r _ u n s i w irq sirq st _ </proc/stat
 cpu_total=$((u + n + s + i + w + irq + sirq + st))

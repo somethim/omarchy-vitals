@@ -282,9 +282,9 @@ Panel {
   readonly property var npu: sample.npu ? sample.npu : null
 
   function gpuSummary(g) {
-    var parts = [g.busy + "%"]
-    if (g.vramTotal > 0) parts.push("VRAM " + root.fmtSize(g.vramUsed) + " / " + root.fmtSize(g.vramTotal))
-    if (g.gttTotal > 0) parts.push("shared " + root.fmtSize(g.gttUsed))
+    // VRAM plus shared memory: on an integrated GPU the small VRAM slice is
+    // always full, and what a model takes shows up in shared memory.
+    var parts = [g.busy + "%", root.fmtSize(g.vramUsed + g.gttUsed) + " used"]
     if (g.temp >= 0) parts.push(g.temp + " °C")
     return parts.join("  ·  ")
   }
@@ -647,6 +647,10 @@ Panel {
                 id: valueText
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
+                // Never run into the label; cut long values from the left.
+                width: Math.min(implicitWidth, parent.width - labelText.x - labelText.width - Style.space(10))
+                horizontalAlignment: Text.AlignRight
+                elide: Text.ElideLeft
                 text: modelData.value
                 color: row.warn ? Color.urgent : Color.muted
                 font.family: Style.font.family

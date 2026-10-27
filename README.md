@@ -86,9 +86,9 @@ hot-reloads on save), or with `omarchy bar set adams100111.vitals <key> <value>`
 ## GPU
 
 The `gpu` resource shows how busy the GPU is, as reported by drivers that
-expose it (amdgpu). The popup adds VRAM, shared memory and temperature. On an
-integrated GPU, VRAM is a small fixed slice and models live in shared memory,
-so that is the figure to watch while running a local model.
+expose it (amdgpu). The popup adds the memory it uses (VRAM plus shared memory)
+and its temperature. On an integrated GPU, VRAM is a small fixed slice and a
+local model mostly lives in shared memory, so the two are shown as one figure.
 
 ## NPU
 
